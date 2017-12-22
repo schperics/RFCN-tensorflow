@@ -18,7 +18,6 @@
 
 
 from Utils.ArgSave import *
-import sys
 import os
 
 parser = StorableArgparse(description='RFCN trainer.')
@@ -72,6 +71,7 @@ from Utils import Model
 from Utils import Export
 from tensorflow.python.client import timeline
 from Dataset.ICDAR2013Dataset import ICDAR2013Dataset
+from Dataset.ICDAR2017Dataset import ICDAR2017Dataset
 import re
 
 globalStep = tf.Variable(0, name='globalStep', trainable=False)
@@ -81,6 +81,7 @@ Model.download()
 
 dataset = BoxLoader()
 dataset.add(ICDAR2013Dataset(opt.dataset, randomZoom=opt.randZoom == 1))
+dataset.add(ICDAR2017Dataset("/mnt/icdar2017_mlt", randomZoom=opt.randZoom == 1))
 """
 if opt.mergeValidationSet == 1:
     dataset.add(ICDAR2013Dataset(opt.dataset, set="val"))
