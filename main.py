@@ -80,7 +80,7 @@ globalStepInc = tf.assign_add(globalStep, 1)
 Model.download()
 
 dataset = BoxLoader()
-dataset.add(ICDAR2013Dataset(opt.dataset, randomZoom=opt.randZoom == 1))
+dataset.add(ICDAR2013Dataset("/mnt/ICDAR2013", randomZoom=opt.randZoom == 1))
 dataset.add(ICDAR2017Dataset("/mnt/icdar2017_mlt", randomZoom=opt.randZoom == 1))
 """
 if opt.mergeValidationSet == 1:
@@ -102,6 +102,7 @@ def createUpdateOp(gradClip=1):
         optimizer = tf.train.AdamOptimizer(learning_rate=opt.learningRate, epsilon=opt.adamEps)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         totalLoss = slim.losses.get_total_loss()
+        tf.summary.scalar('loss', totalLoss)
         grads = optimizer.compute_gradients(totalLoss, var_list=net.getVariables())
         if gradClip is not None:
             cGrads = []
@@ -117,8 +118,7 @@ def createUpdateOp(gradClip=1):
 
 
 trainOp = createUpdateOp()
-
-saver = tf.train.Saver(keep_checkpoint_every_n_hours=4, max_to_keep=100)
+saver = tf.train.Saver(keep_checkpoint_every_n_hours=4, max_to_keep=10)
 
 if opt.profile == 1:
     runOptions = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
@@ -128,8 +128,10 @@ else:
     runOptions = None
     runMetadata = None
 
+checkpointPath = os.path.join(opt.name, "save")
+
 with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=8)) as sess:
-    if not loadCheckpoint(sess, opt.name + "/save/", opt.resume):
+    if not loadCheckpoint(sess, checkpointPath, opt.resume):
         print("Loading GoogleNet")
         net.importWeights(sess, "./inception_resnet_v2_2016_08_30.ckpt")
         # net.importWeights(sess, "initialWeights/", permutateRgb=False)
@@ -142,8 +144,12 @@ with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=8)) as sess:
 
     dataset.startThreads(sess)
 
+    summaryOp = tf.summary.merge_all()
+    summaryWriter = tf.summary.FileWriter(os.path.join(opt.name, "save"), sess.graph)
+
     runManager = RunManager(sess, options=runOptions, run_metadata=runMetadata)
     runManager.add("train", [globalStepInc, trainOp], modRun=1)
+    runManager.add("summary", [summaryOp], modRun=opt.reportInterval)
 
     visualizer = VisualizeOutput.OutputVisualizer(opt, runManager, dataset, net, images, boxes, classes)
 
@@ -175,20 +181,19 @@ with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=8)) as sess:
 
         visualizer.draw(res)
 
-        if i % opt.reportInterval == 0:
+        if "summary" in res:
             if cycleCnt > 0:
                 loss = lossSum / cycleCnt
-
-            # lossS=sess.run(trainLossSum, feed_dict={
-            # 	trainLossFeed: loss
-            # })
-            # log.add_summary(lossS, global_step=samplesSeen)
-
             epoch = "%.2f" % (float(i) / dataset.count())
             print("Iteration " + str(i) + " (epoch: " + epoch + "): loss: " + str(loss))
             lossSum = 0
             cycleCnt = 0
+            summary = res["summary"]
+            summaryWriter.add_summary(summary, i)
 
         if i % opt.saveInterval == 0:
             print("Saving checkpoint " + str(i))
-            saver.save(sess, opt.name + "/save/model_" + str(i), write_meta_graph=False)
+            saver.save(sess,
+                       os.path.join(checkpointPath, "model"),
+                       global_step=i,
+                       write_meta_graph=False)
