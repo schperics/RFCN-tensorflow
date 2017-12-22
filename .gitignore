@@ -7,3 +7,4 @@ save
 *.ckpt
 *.pyc
 timeline.json
+.idea/
