@@ -3,7 +3,8 @@ TF_INC := $(shell ${PYTHON} -c 'import tensorflow as tf; print(tf.sysconfig.get_
 TF_LIB := $(shell ${PYTHON} -c 'import tensorflow as tf; print(tf.sysconfig.get_lib())')
 USE_OLD_EABI?=1
 USE_GPU?=1
-INCLUDES=-I/usr/local/lib/python3.5/dist-packages/tensorflow/include/external/nsync/public
+INCLUDES=-I$(TF_INC) -I$(TF_INC)/external/nsync/public
+LIBS=-L$(TF_LIB) -ltensorflow_framework
 NVCC=/usr/local/cuda/bin/nvcc
 ARCH=-arch=sm_30 \
  -gencode=arch=compute_30,code=sm_30 \
@@ -30,19 +31,19 @@ endif
 all: roi_pooling.so
 
 roi_pooling_grad.o: roi_pooling_grad.cc
-	g++ -std=c++11 ${EABIFLAGS} ${GPUFLAGS} -c -o roi_pooling_grad.o roi_pooling_grad.cc -I $(TF_INC) $(INCLUDES) -fPIC -O2
+	g++ -std=c++11 ${EABIFLAGS} ${GPUFLAGS} -c -o roi_pooling_grad.o roi_pooling_grad.cc $(INCLUDES) -fPIC -O2
 
 roi_pooling.o: roi_pooling.cc
-	g++ -std=c++11 ${EABIFLAGS} ${GPUFLAGS} -c -o roi_pooling.o roi_pooling.cc -I $(TF_INC) $(INCLUDES) -fPIC -O2
+	g++ -std=c++11 ${EABIFLAGS} ${GPUFLAGS} -c -o roi_pooling.o roi_pooling.cc $(INCLUDES) -fPIC -O2
 
 roi_pooling.cu.o: roi_pooling.cu.cc
-	$(NVCC) $(ARCH) -std=c++11 -c -o roi_pooling.cu.o roi_pooling.cu.cc -I $TF_INC $(INCLUDES) -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
+	$(NVCC) $(ARCH) -std=c++11 -c -o roi_pooling.cu.o roi_pooling.cu.cc $(INCLUDES) -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
 
 roi_pooling_grad.cu.o: roi_pooling_grad.cu.cc
-	$(NVCC) $(ARCH) -std=c++11 -c -o roi_pooling_grad.cu.o roi_pooling_grad.cu.cc -I $TF_INC $(INCLUDES) -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
+	$(NVCC) $(ARCH) -std=c++11 -c -o roi_pooling_grad.cu.o roi_pooling_grad.cu.cc $(INCLUDES) -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
 
 roi_pooling.so: ${LINKDEPS}
-	g++ -std=c++11 ${EABIFLAGS} -shared -o roi_pooling.so ${LINKDEPS} -I $(TF_INC) $(INCLUDES) -L$(TF_LIB) -ltensorflow_framework -fPIC -O2
+	g++ -std=c++11 ${EABIFLAGS} -shared -o roi_pooling.so ${LINKDEPS} $(LIBS) -fPIC -O2
 
 
 #roi_pooling.so: roi_pooling.o roi_pooling_grad.o roi_pooling.cu.o roi_pooling_grad.cu.o
