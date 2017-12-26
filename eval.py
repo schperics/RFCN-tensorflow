@@ -88,14 +88,19 @@ with tf.Session() as sess:
 
         rBoxes, rScores, rClasses = sess.run([boxes, scores, classes], feed_dict={image: np.expand_dims(img, 0)})
 
-        res = Visualize.drawBoxes(img, rBoxes, rClasses, [categories[i] for i in rClasses.tolist()], palette,
-                                  scores=rScores)
+        num = input.getName().split('.')[0]
 
-        output.put(input.getName(), res)
+        res_filename = os.path.join(opt.o, "res_img_{}.txt".format(num))
+        with open(res_filename, "wt") as f:
+            print("{}: rboxes = {}".format(res_filename, len(rBoxes)))
+            for rBox in rBoxes:
+                f.write('{},{},{},{}\n'.format(int(rBox[0]),
+                                               int(rBox[1]),
+                                               int(rBox[2]),
+                                               int(rBox[3])))
 
         if opt.p == 1:
-            cv2.imshow("result", res)
-            if opt.o == "":
-                cv2.waitKey(input.getDelay() if opt.delay < 0 else opt.delay)
-            else:
-                cv2.waitKey(1)
+            res = Visualize.drawBoxes(img, rBoxes, rClasses, [categories[i] for i in rClasses.tolist()], palette,
+                                      scores=rScores)
+
+            output.put(input.getName(), res)
