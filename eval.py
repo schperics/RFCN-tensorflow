@@ -71,7 +71,7 @@ def preprocessInput(img):
         s, p = calcPad(img.shape[1])
         img = img[:, p:p + s]
 
-    return img
+    return img, zoom
 
 
 with tf.Session() as sess:
@@ -84,7 +84,7 @@ with tf.Session() as sess:
         if img is None:
             break
 
-        img = preprocessInput(img)
+        img, zoom = preprocessInput(img)
 
         rBoxes, rScores, rClasses = sess.run([boxes, scores, classes], feed_dict={image: np.expand_dims(img, 0)})
 
@@ -94,10 +94,10 @@ with tf.Session() as sess:
         with open(res_filename, "wt") as f:
             print("{}: rboxes = {}".format(res_filename, len(rBoxes)))
             for rBox in rBoxes:
-                f.write('{},{},{},{}\n'.format(int(rBox[0]),
-                                               int(rBox[1]),
-                                               int(rBox[2]),
-                                               int(rBox[3])))
+                f.write('{},{},{},{}\n'.format(int(rBox[0] / zoom),
+                                               int(rBox[1] / zoom),
+                                               int(rBox[2] / zoom),
+                                               int(rBox[3] / zoom)))
 
         if opt.p == 1:
             res = Visualize.drawBoxes(img, rBoxes, rClasses, [categories[i] for i in rClasses.tolist()], palette,
