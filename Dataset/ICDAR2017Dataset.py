@@ -14,12 +14,14 @@
 #
 # ==============================================================================
 
-import random
-import numpy as np
-import cv2
+import codecs
 import glob
 import os
-import codecs
+import random
+
+import cv2
+import numpy as np
+
 from . import BoxAwareRandZoom
 
 
@@ -92,13 +94,11 @@ class ICDAR2017Dataset:
 
             if self.normalizeSize:
                 minShape = min(img.shape[0], img.shape[1])
-                maxShape = min(img.shape[0], img.shape[1])
-                sizeMul = 640.0 / minShape
-                maxShape = maxShape * sizeMul
-                if maxShape > 1024 :
-                    print("Warning: too big image({}, {}). Skipping.".format(img.shape[0], img.shape[1]))
-                    continue
-
+                maxShape = max(img.shape[0], img.shape[1])
+                if maxShape > 1024:
+                    sizeMul = 1024 / maxShape
+                else:
+                    sizeMul = 640.0 / minShape
                 img = cv2.resize(img, (int(img.shape[1] * sizeMul), int(img.shape[0] * sizeMul)))
 
             m = img.shape[1] % 64

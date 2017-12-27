@@ -32,8 +32,8 @@ class RPN:
         self.inputDownscale = inputDownscale
         self.offset = offset
         # TODO : anchors
-        self.anchors = anchors if anchors is not None else self.makeAnchors([64, 128, 256, 512])
-        print("Anchors: ", self.anchors)
+        self.anchors = anchors if anchors is not None else self.makeAnchors([32, 64, 112, 192, 304, 416])
+        print("Anchors({}): {}".format(len(self.anchors), self.anchors))
         self.tfAnchors = tf.constant(self.anchors, dtype=tf.float32)
 
         self.hA = tf.reshape(self.tfAnchors[:, 0], [-1])
@@ -256,13 +256,12 @@ class RPN:
         return boxes, scores
 
     @staticmethod
-    def makeAnchors(sizeList, sizeLim=[1024, 1024]):
+    def makeAnchors(sizeList, sizeLim=1024):
         res = []
+        ratio = [1, 2, 3, 4, 6]
         for s in sizeList:
-            res.append([s, s])
-            if s * 2 <= sizeLim[0]:
-                res.append([int(s * math.sqrt(2)), int(s / math.sqrt(2))])
-            if s * 2 <= sizeLim[1]:
-                res.append([int(s / math.sqrt(2)), int(s * math.sqrt(2))])
-
+            for r in ratio:
+                w = s * r
+                if w <= sizeLim:
+                    res.append([s, w])
         return res
