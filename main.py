@@ -18,12 +18,12 @@
 
 
 from Utils.ArgSave import *
-import os
 
 parser = StorableArgparse(description='RFCN trainer.')
 parser.add_argument('-learningRate', type=float, default=0.0001, help='Learning rate')
 parser.add_argument('-adamEps', type=float, default=1e-8, help='Adam epsilon')
-parser.add_argument('-dataset', type=str, default="/data/Datasets/COCO", help="Path to COCO dataset")
+parser.add_argument('-icdar2013', default=None, type=str, help="")
+parser.add_argument('-icdar2017', default=None, type=str, help="")
 parser.add_argument('-name', type=str, default="save", help="Directory to save checkpoints")
 parser.add_argument('-saveInterval', type=int, default=10000, help='Save model for this amount of iterations')
 parser.add_argument('-reportInterval', type=int, default=30, help='Repeat after this amount of iterations')
@@ -46,7 +46,7 @@ opt = parser.parse_args()
 if not os.path.isdir(opt.name):
     os.makedirs(opt.name)
 
-opt = parser.load(opt.name + "/args.json")
+#opt = parser.load(opt.name + "/args.json")
 parser.save(opt.name + "/args.json")
 
 if not os.path.isdir(opt.name + "/log"):
@@ -64,7 +64,7 @@ from tensorflow.python.ops import control_flow_ops
 from Dataset.BoxLoader import *
 from Utils.RunManager import *
 from Utils.CheckpointLoader import *
-from BoxInceptionResnet import *
+from BoxResnet import *
 from Dataset import Augment
 from Visualize import VisualizeOutput
 from Utils import Model
@@ -80,30 +80,33 @@ globalStepInc = tf.assign_add(globalStep, 1)
 Model.download()
 
 dataset = BoxLoader()
-dataset.add(ICDAR2013Dataset("/mnt/ICDAR2013", randomZoom=opt.randZoom == 1))
-dataset.add(ICDAR2017Dataset("/mnt/icdar2017_mlt", randomZoom=opt.randZoom == 1))
-"""
-if opt.mergeValidationSet == 1:
-    dataset.add(ICDAR2013Dataset(opt.dataset, set="val"))
-"""
+if opt.icdar2013:
+    dataset.add(ICDAR2013Dataset(opt.icdar2013, randomZoom=opt.randZoom == 1))
+if opt.icdar2017:
+    dataset.add(ICDAR2017Dataset(opt.icdar2017, randomZoom=opt.randZoom == 1))
 
 images, boxes, classes = Augment.augment(*dataset.get())
 
 print("Number of categories: " + str(dataset.categoryCount()))
 print(dataset.getCaptionMap())
 
-net = BoxInceptionResnet(images, dataset.categoryCount(), name="boxnet", trainFrom=opt.trainFrom,
-                         hardMining=opt.hardMining == 1, freezeBatchNorm=opt.freezeBatchNorm == 1)
-slim.losses.add_loss(net.getLoss(boxes, classes))
+net = BoxResnet(images,
+                dataset.categoryCount(),
+                name="boxnet",
+                trainFrom=opt.trainFrom,
+                hardMining=opt.hardMining == 1,
+                freezeBatchNorm=opt.freezeBatchNorm == 1)
+
+tf.losses.add_loss(net.getLoss(boxes, classes))
 
 
 def createUpdateOp(gradClip=1):
     with tf.name_scope("optimizer"):
         optimizer = tf.train.AdamOptimizer(learning_rate=opt.learningRate, epsilon=opt.adamEps)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        totalLoss = slim.losses.get_total_loss()
+        totalLoss = tf.losses.get_total_loss()
         tf.summary.scalar('loss', totalLoss)
-        grads = optimizer.compute_gradients(totalLoss, var_list=net.getVariables())
+        grads = optimizer.compute_gradients(totalLoss, var_list=net.getVariables(includeFeatures=True))
         if gradClip is not None:
             cGrads = []
             for g, v in grads:
@@ -132,8 +135,8 @@ checkpointPath = os.path.join(opt.name, "save")
 
 with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=8)) as sess:
     if not loadCheckpoint(sess, checkpointPath, opt.resume):
-        print("Loading GoogleNet")
-        net.importWeights(sess, "./inception_resnet_v2_2016_08_30.ckpt")
+        print("Loading ResNet_v2_101")
+        net.importWeights(sess, "./resnet_v2_101.ckpt")
         # net.importWeights(sess, "initialWeights/", permutateRgb=False)
         print("Done.")
 

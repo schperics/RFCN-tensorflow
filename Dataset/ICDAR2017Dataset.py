@@ -91,17 +91,23 @@ class ICDAR2017Dataset:
                                                         keepBoxes=True)
 
             if self.normalizeSize:
-                sizeMul = 640.0 / min(img.shape[0], img.shape[1])
+                minShape = min(img.shape[0], img.shape[1])
+                maxShape = min(img.shape[0], img.shape[1])
+                sizeMul = 640.0 / minShape
+                maxShape = maxShape * sizeMul
+                if maxShape > 1024 :
+                    print("Warning: too big image({}, {}). Skipping.".format(img.shape[0], img.shape[1]))
+                    continue
+
                 img = cv2.resize(img, (int(img.shape[1] * sizeMul), int(img.shape[0] * sizeMul)))
 
-            m = img.shape[1] % 32
+            m = img.shape[1] % 64
             if m != 0:
                 padLeft = int(m / 2)
                 img = img[:, padLeft: padLeft + img.shape[1] - m]
 
-            m = img.shape[0] % 32
+            m = img.shape[0] % 64
             if m != 0:
-                m = img.shape[0] % 32
                 padTop = int(m / 2)
                 img = img[padTop: padTop + img.shape[0] - m]
 

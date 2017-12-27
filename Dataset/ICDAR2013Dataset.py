@@ -90,14 +90,13 @@ class ICDAR2013Dataset:
                 sizeMul = 640.0 / min(img.shape[0], img.shape[1])
                 img = cv2.resize(img, (int(img.shape[1] * sizeMul), int(img.shape[0] * sizeMul)))
 
-            m = img.shape[1] % 32
+            m = img.shape[1] % 64
             if m != 0:
                 padLeft = int(m / 2)
                 img = img[:, padLeft: padLeft + img.shape[1] - m]
 
-            m = img.shape[0] % 32
+            m = img.shape[0] % 64
             if m != 0:
-                m = img.shape[0] % 32
                 padTop = int(m / 2)
                 img = img[padTop: padTop + img.shape[0] - m]
 

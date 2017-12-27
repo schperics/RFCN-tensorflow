@@ -21,7 +21,7 @@ import os
 import cv2
 import numpy as np
 import tensorflow as tf
-from BoxInceptionResnet import BoxInceptionResnet
+from BoxResnet import BoxResnet
 from Visualize import Visualize
 from Utils import CheckpointLoader
 from Utils import PreviewIO
@@ -45,7 +45,7 @@ categories = ['text']
 palette = Visualize.Palette(len(categories))
 
 image = tf.placeholder(tf.float32, [None, None, None, 3])
-net = BoxInceptionResnet(image, len(categories), name="boxnet")
+net = BoxResnet(image, len(categories), name="boxnet")
 
 boxes, scores, classes = net.getBoxes(scoreThreshold=opt.threshold)
 
@@ -55,7 +55,7 @@ output = PreviewIO.PreviewOutput(opt.o, input.getFps())
 
 def preprocessInput(img):
     def calcPad(size):
-        m = size % 32
+        m = size % 64
         p = int(m / 2)
         s = size - m
         return s, p
@@ -63,11 +63,11 @@ def preprocessInput(img):
     zoom = max(640.0 / img.shape[0], 640.0 / img.shape[1])
     img = cv2.resize(img, (int(zoom * img.shape[1]), int(zoom * img.shape[0])))
 
-    if img.shape[0] % 32 != 0:
+    if img.shape[0] % 64 != 0:
         s, p = calcPad(img.shape[0])
         img = img[p:p + s]
 
-    if img.shape[1] % 32 != 0:
+    if img.shape[1] % 64 != 0:
         s, p = calcPad(img.shape[1])
         img = img[:, p:p + s]
 

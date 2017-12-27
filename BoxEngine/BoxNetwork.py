@@ -14,37 +14,57 @@
 #
 # ==============================================================================
 
-from BoxEngine.BoxRefinementNetwork import BoxRefinementNetwork
-from BoxEngine.RPN import RPN
 import tensorflow as tf
 
+from BoxEngine.BoxRefinementNetwork import BoxRefinementNetwork
+from BoxEngine.RPN import RPN
+
+
 class BoxNetwork:
-	def __init__(self, nCategories, rpnLayer, rpnDownscale, rpnOffset, featureLayer=None, featureDownsample=None, featureOffset=None, weightDecay=1e-6, hardMining=True):
-		if featureLayer is None:
-			featureLayer=rpnLayer
+    def __init__(self,
+                 nCategories,
+                 rpnLayer,
+                 rpnDownscale,
+                 rpnOffset,
+                 featureLayer=None,
+                 featureDownsample=None,
+                 featureOffset=None,
+                 weightDecay=1e-6,
+                 hardMining=True):
+        if featureLayer is None:
+            featureLayer = rpnLayer
 
-		if featureDownsample is None:
-			featureDownsample=rpnDownscale
-			
-		if featureOffset is None:
-			rpnOffset=featureOffset
+        if featureDownsample is None:
+            featureDownsample = rpnDownscale
 
-		with tf.name_scope("BoxNetwork"):
-			self.rpn = RPN(rpnLayer, immediateSize=512, weightDecay=weightDecay, inputDownscale=rpnDownscale, offset=rpnOffset)
-			self.boxRefiner = BoxRefinementNetwork(featureLayer, nCategories, downsample=featureDownsample, offset=featureOffset, hardMining=hardMining)
+        if featureOffset is None:
+            rpnOffset = featureOffset
 
-			self.proposals, self.proposalScores = self.rpn.getPositiveOutputs(maxOutSize=300)
+        with tf.name_scope("BoxNetwork"):
+            self.rpn = RPN(rpnLayer,
+                           immediateSize=512,
+                           weightDecay=weightDecay,
+                           inputDownscale=rpnDownscale,
+                           offset=rpnOffset)
 
-		
-	def getProposals(self, threshold=None):
-		if threshold is not None and threshold>0:
-			s = tf.cast(tf.where(self.proposalScores > threshold), tf.int32)
-			return tf.gather_nd(self.proposals, s), tf.gather_nd(self.proposalScores, s)
-		else:
-			return self.proposals, self.proposalScores
-		
-	def getBoxes(self, nmsThreshold=0.3, scoreThreshold=0.8):
-		return self.boxRefiner.getBoxes(self.proposals, self.proposalScores, maxOutputs=50, nmsThreshold=nmsThreshold, scoreThreshold=scoreThreshold)
+            self.boxRefiner = BoxRefinementNetwork(featureLayer,
+                                                   nCategories,
+                                                   downsample=featureDownsample,
+                                                   offset=featureOffset,
+                                                   hardMining=hardMining)
 
-	def getLoss(self, refBoxes, refClasses):
-		return self.rpn.loss(refBoxes) + self.boxRefiner.loss(self.proposals, refBoxes, refClasses)
+            self.proposals, self.proposalScores = self.rpn.getPositiveOutputs(maxOutSize=300)
+
+    def getProposals(self, threshold=None):
+        if threshold is not None and threshold > 0:
+            s = tf.cast(tf.where(self.proposalScores > threshold), tf.int32)
+            return tf.gather_nd(self.proposals, s), tf.gather_nd(self.proposalScores, s)
+        else:
+            return self.proposals, self.proposalScores
+
+    def getBoxes(self, nmsThreshold=0.3, scoreThreshold=0.8):
+        return self.boxRefiner.getBoxes(self.proposals, self.proposalScores, maxOutputs=50, nmsThreshold=nmsThreshold,
+                                        scoreThreshold=scoreThreshold)
+
+    def getLoss(self, refBoxes, refClasses):
+        return self.rpn.loss(refBoxes) + self.boxRefiner.loss(self.proposals, refBoxes, refClasses)
