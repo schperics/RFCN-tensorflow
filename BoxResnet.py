@@ -64,7 +64,7 @@ def fe_rpn(input):
     conv1 = slim.conv2d(input, 1024, [1, 3])
     conv2 = slim.conv2d(input, 1024, [3, 3])
     pool = slim.max_pool2d(input, [2, 2], stride=2)
-    deconv = slim.convolution2d_transpose(pool, 1024, [2, 2], stride=2)
+    deconv = slim.convolution2d_transpose(pool, 1024, [3, 3], stride=2)
     output = tf.concat((conv1, conv2, deconv), axis=-1)
     return output
 
@@ -109,7 +109,6 @@ class BoxResnet(BoxNetwork):
                                     activation_fn=tf.nn.relu):
                     rpnInput = fe_rpn(res30)
                     featureInput = hfg([res11, res16, res21, res27, res33], 256)
-                    # TODO: featureOffset, rpnOffset
                     BoxNetwork.__init__(self,
                                         nCategories,
                                         rpnInput,

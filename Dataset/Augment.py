@@ -15,7 +15,6 @@
 # ==============================================================================
 
 import tensorflow as tf
-import threading
 
 
 def nonlinear(imageList, lower, upper):

@@ -14,12 +14,22 @@
 #
 # ==============================================================================
 
-import random
-import numpy as np
-import cv2
 import glob
 import os
-from . import BoxAwareRandZoom
+import random
+
+import cv2
+import numpy as np
+
+try:
+    from . import BoxAwareRandZoom
+except:
+    import BoxAwareRandZoom
+
+try:
+    from . import ICDARCommon
+except:
+    import ICDARCommon
 
 
 class ICDAR2013Dataset:
@@ -79,48 +89,7 @@ class ICDAR2013Dataset:
                     "h": h
                 })
 
-            if self.randomZoom:
-                img, iBoxes = BoxAwareRandZoom.randZoom(img,
-                                                        iBoxes,
-                                                        keepOriginalRatio=False,
-                                                        keepOriginalSize=False,
-                                                        keepBoxes=True)
-
-            if self.normalizeSize:
-                sizeMul = 640.0 / min(img.shape[0], img.shape[1])
-                img = cv2.resize(img, (int(img.shape[1] * sizeMul), int(img.shape[0] * sizeMul)))
-
-            m = img.shape[1] % 64
-            if m != 0:
-                padLeft = int(m / 2)
-                img = img[:, padLeft: padLeft + img.shape[1] - m]
-
-            m = img.shape[0] % 64
-            if m != 0:
-                padTop = int(m / 2)
-                img = img[padTop: padTop + img.shape[0] - m]
-
-            if img.shape[0] < 256 or img.shape[1] < 256:
-                print("Warning: Image to small, skipping: " + str(img.shape))
-                continue
-
-            boxes = []
-            categories = []
-            for i in range(len(iBoxes)):
-                x1, y1, w, h = iBoxes[i]["x"], iBoxes[i]["y"], iBoxes[i]["w"], iBoxes[i]["h"]
-                newBox = [int(x1 * sizeMul) - padLeft,
-                          int(y1 * sizeMul) - padTop,
-                          int((x1 + w) * sizeMul) - padLeft,
-                          int((y1 + h) * sizeMul) - padTop]
-                newBox[0] = max(min(newBox[0], img.shape[1]), 0)
-                newBox[1] = max(min(newBox[1], img.shape[0]), 0)
-                newBox[2] = max(min(newBox[2], img.shape[1]), 0)
-                newBox[3] = max(min(newBox[3], img.shape[0]), 0)
-
-                # TODO
-                if (newBox[2] - newBox[0]) >= 16 and (newBox[3] - newBox[1]) >= 16:
-                    boxes.append(newBox)
-                    categories.append(0)  # Always text
+            img, boxes, categories = ICDARCommon.preprocessImages(img, iBoxes)
 
             if len(boxes) == 0:
                 print("Warning: No boxes on image. Skipping.")
@@ -134,3 +103,15 @@ class ICDAR2013Dataset:
 
     def count(self):
         return len(self.image_ids)
+
+
+if __name__ == "__main__":
+    dataset = ICDAR2013Dataset("/mnt/ICDAR2013", set="train")
+    dataset.init()
+    for id in dataset.image_ids:
+        imgFile = os.path.join("/mnt/ICDAR2013/train", "image", "{}.jpg".format(id))
+        img = cv2.imread(imgFile)
+        h, w, c = img.shape
+        print(h, w, h / w)
+
+    print(dataset.count())
