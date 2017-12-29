@@ -46,7 +46,7 @@ opt = parser.parse_args()
 if not os.path.isdir(opt.name):
     os.makedirs(opt.name)
 
-#opt = parser.load(opt.name + "/args.json")
+# opt = parser.load(opt.name + "/args.json")
 parser.save(opt.name + "/args.json")
 
 if not os.path.isdir(opt.name + "/log"):
@@ -93,9 +93,7 @@ print(dataset.getCaptionMap())
 net = BoxResnet(images,
                 dataset.categoryCount(),
                 name="boxnet",
-                trainFrom=opt.trainFrom,
-                hardMining=opt.hardMining == 1,
-                freezeBatchNorm=opt.freezeBatchNorm == 1)
+                hardMining=opt.hardMining == 1)
 
 tf.losses.add_loss(net.getLoss(boxes, classes))
 

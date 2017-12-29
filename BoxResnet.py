@@ -14,12 +14,51 @@
 #
 # ==============================================================================
 
+import tensorflow as tf
+import tensorflow.contrib.slim.python.slim.nets.resnet_v2 as resnet
+
 from BoxEngine.BoxNetwork import BoxNetwork
 from Utils import CheckpointLoader
-import tensorflow as tf
-from resnet_v2 import resnet_v2_101
 
 slim = tf.contrib.slim
+
+
+# slim의 논문에서의 resnet 구현은 convX_1 에서 size가 줄어들게 되어있다. 하지만 slim의 구현은 마지막 layer에서 줄어들게 되어있다.
+# res30은 block3의 마지막 layer라서 원본의 1/32이고 block4는 stride가 1이라 크기가 줄지 않는다.
+# 따라서 원래 resnet 논문대로 block의 첫 layer에서 사이즈가 줄어야 FEN에서 크가가 같은 layer끼리 모을수가 있다.
+def resnet_v2_block(scope, base_depth, num_units, stride):
+    return resnet.resnet_utils.Block(scope, resnet.bottleneck, [{
+        'depth': base_depth * 4,
+        'depth_bottleneck': base_depth,
+        'stride': stride
+    }] + [{
+        'depth': base_depth * 4,
+        'depth_bottleneck': base_depth,
+        'stride': 1
+    }] * (num_units - 1))
+
+
+def resnet_v2_101(inputs,
+                  num_classes=None,
+                  is_training=True,
+                  global_pool=True,
+                  output_stride=None,
+                  reuse=None,
+                  scope='resnet_v2_101'):
+    blocks = [resnet_v2_block('block1', base_depth=64, num_units=3, stride=2),
+              resnet_v2_block('block2', base_depth=128, num_units=4, stride=2),
+              resnet_v2_block('block3', base_depth=256, num_units=23, stride=2),
+              resnet_v2_block('block4', base_depth=512, num_units=3, stride=1)]
+    return resnet.resnet_v2(inputs,
+                            blocks,
+                            num_classes,
+                            is_training,
+                            global_pool,
+                            output_stride,
+                            include_root_block=True,
+                            reuse=reuse,
+                            scope=scope)
+
 
 def fe_rpn(input):
     conv1 = slim.conv2d(input, 1024, [1, 3])
@@ -42,30 +81,23 @@ class BoxResnet(BoxNetwork):
                  nCategories,
                  name="BoxNetwork",
                  weightDecay=0.00004,
-                 freezeBatchNorm=False,
                  reuse=False,
                  isTraining=True,
-                 trainFrom=None,
                  hardMining=True):
         self.boxThreshold = 0.5
 
-        if trainFrom == "0":
-            trainFrom = "Conv2d_1a_3x3"
-        elif trainFrom == "-1":
-            trainFrom = None
-
-        print("Training network from " + (trainFrom if trainFrom is not None else "end"))
-
         with tf.variable_scope(name, reuse=reuse) as scope:
-            self.resNet, endpoints = resnet_v2_101(inputs,
-                                                   is_training=isTraining,
-                                                   scope=scope)
+            with slim.arg_scope(resnet.resnet_arg_scope()):
+                self.resNet, endpoints = resnet_v2_101(inputs,
+                                                       is_training=isTraining,
+                                                       global_pool=False,
+                                                       scope=scope)
             res11 = endpoints[name + "/block3/unit_4/bottleneck_v2"]
             res16 = endpoints[name + "/block3/unit_9/bottleneck_v2"]
             res21 = endpoints[name + "/block3/unit_14/bottleneck_v2"]
             res27 = endpoints[name + "/block3/unit_20/bottleneck_v2"]
             res30 = endpoints[name + "/block3/unit_23/bottleneck_v2"]
-            #res33 = endpoints[name + "/block4/unit_3/bottleneck_v2"]
+            res33 = endpoints[name + "/block4/unit_3/bottleneck_v2"]
 
             self.scope = scope
 
@@ -76,16 +108,16 @@ class BoxResnet(BoxNetwork):
                                     padding='SAME',
                                     activation_fn=tf.nn.relu):
                     rpnInput = fe_rpn(res30)
-                    featureInput = hfg([res11, res16, res21, res27], 256)
+                    featureInput = hfg([res11, res16, res21, res27, res33], 256)
                     # TODO: featureOffset, rpnOffset
                     BoxNetwork.__init__(self,
                                         nCategories,
                                         rpnInput,
                                         32,  # rpnDownscale
-                                        [32, 32],  # rpnOffset
+                                        [0, 0],  # rpnOffset
                                         featureInput,
-                                        16,  # featureDownsample
-                                        [16, 16],  # featureOffset
+                                        32,  # featureDownsample
+                                        [0, 0],  # featureOffset
                                         weightDecay=weightDecay,
                                         hardMining=hardMining)
 
