@@ -64,6 +64,8 @@ def preprocessInput(img):
         s = size - m
         return s, p
 
+    shape = img.shape
+
     zoom = max(640.0 / img.shape[0], 640.0 / img.shape[1])
     img = cv2.resize(img, (int(zoom * img.shape[1]), int(zoom * img.shape[0])))
 
@@ -75,7 +77,7 @@ def preprocessInput(img):
         s, p = calcPad(img.shape[1])
         img = img[:, p:p + s]
 
-    return img, zoom
+    return img, zoom, shape
 
 
 with tf.Session() as sess:
@@ -93,7 +95,7 @@ with tf.Session() as sess:
                 if img is None:
                     break
 
-                img, zoom = preprocessInput(img)
+                img, zoom, shape = preprocessInput(img)
 
                 rBoxes, rScores, rClasses = sess.run([boxes, scores, classes],
                                                      feed_dict={image: np.expand_dims(img, 0)})
@@ -111,10 +113,10 @@ with tf.Session() as sess:
                 with open(res_filename, "wt") as f:
                     print("{}: rboxes = {}".format(res_filename, len(rBoxes)))
                     for rBox in rBoxes:
-                        f.write('{},{},{},{}\n'.format(int(rBox[0] / zoom),
-                                                       int(rBox[1] / zoom),
-                                                       int(rBox[2] / zoom),
-                                                       int(rBox[3] / zoom)))
+                        f.write('{},{},{},{}\n'.format(max(int(rBox[0] / zoom), 0),
+                                                       max(int(rBox[1] / zoom), 0),
+                                                       min(int(rBox[2] / zoom), shape[1]),
+                                                       min(int(rBox[3] / zoom), shape[0])))
 
                 if opt.p == 1:
                     res = Visualize.drawBoxes(img, rBoxes, rClasses, [categories[i] for i in rClasses.tolist()],
