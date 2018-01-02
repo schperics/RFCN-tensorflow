@@ -43,7 +43,7 @@ class COCOeval:
     #  dtIgnore   - [TxD] ignore flag for each dt at each IoU
     #
     # accumulate(): accumulates the per-image, per-category evaluation
-    # results in "evalImgs" into the dictionary "eval" with fields:
+    # results in "evalImgs" into the dictionary "icdar2013_eval" with fields:
     #  params     - parameters used for evaluation
     #  date       - date evaluation was performed
     #  counts     - [T,R,K,A,M] parameter dimensions (see above)
@@ -315,7 +315,7 @@ class COCOeval:
 
     def accumulate(self, p = None):
         '''
-        Accumulate per image evaluation results and store the result in self.eval
+        Accumulate per image evaluation results and store the result in self.icdar2013_eval
         :param p: input params for evaluation
         :return: None
         '''
